@@ -32,6 +32,7 @@ jobs:
         run: |
           ./configure --architecture $ARCHITECTURE --build-by $BUILD_BY --build-type $BUILD_TYPE --version $VERSION-$(git rev-parse --short HEAD)
           sudo make iso
+          cp build/vyos-$VERSION-*.iso build/vyos-$VERSION-latest-$ARCHITECTURE.iso
           
       - name: Upload artifact
         uses: actions/upload-artifact@v2
@@ -102,4 +103,4 @@ jobs:
         run: |
           tag_name="v${{ env.VERSION }}"
           find ./vyos-${{ env.VERSION }}-${{ env.ARCHITECTURE }}/ -name "vyos-${{ env.VERSION }}-*" \
-              -exec hub release edit -a "{}" -m "" "$tag_name" \;
+             -type f -exec hub release edit -a "{}" -m "" "$tag_name" \;
