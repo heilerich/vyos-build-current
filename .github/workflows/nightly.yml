@@ -17,6 +17,19 @@ env:
   DEBIAN_MIRROR: http://ftp.us.debian.org/debian/
 
 jobs:
+  getrev:
+    runs-on: ubuntu-latest
+    outputs:
+      rtag: ${{ steps.parse.outputs.rtag }}
+    steps:
+      - name: Clone source code
+        run: git clone -b $BRANCH --single-branch $GIT_CLONE_URL
+
+      - name: Parse rev
+        id: parse
+        working-directory: ./vyos-build
+        run: echo "::set-output name=rtag::v${{ env.VERSION }}+$(git rev-parse --short HEAD)"
+
   build-iso:
     runs-on: ubuntu-latest
     container:
@@ -32,13 +45,13 @@ jobs:
         run: |
           ./configure --architecture $ARCHITECTURE --build-by $BUILD_BY --build-type $BUILD_TYPE --version $VERSION-$(git rev-parse --short HEAD)
           sudo make iso
-          cp build/vyos-$VERSION-*.iso build/vyos-$VERSION-latest-$ARCHITECTURE.iso
+          mv build/vyos-$VERSION-*.iso build/vyos-$ARCHITECTURE.iso
           
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
-          name: vyos-${{ env.VERSION }}-${{ env.ARCHITECTURE }}-iso
-          path: vyos-build/build/vyos-${{ env.VERSION }}-*.iso
+          name: vyos-${{ env.ARCHITECTURE }}-iso
+          path: vyos-build/build/vyos-*.iso
 
   build-ova:
     runs-on: ubuntu-latest
@@ -66,18 +79,18 @@ jobs:
           mkdir key && cp /vyos/sign.pem key/privatekey.pem
           ./configure --architecture $ARCHITECTURE --build-by $BUILD_BY --build-type $BUILD_TYPE --version $VERSION-$(git rev-parse --short HEAD)
           sudo make vmware
-          cp build/vyos_vmware_image-signed.ova build/vyos-$VERSION-latest-$ARCHITECTURE.ova
-          mv build/vyos_vmware_image-signed.ova build/vyos-$VERSION-$(git rev-parse --short HEAD)-$ARCHITECTURE.ova
+          mv build/vyos_vmware_image-signed.ova build/vyos-$ARCHITECTURE.ova
 
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
-          name: vyos-${{ env.VERSION }}-${{ env.ARCHITECTURE }}-ova
-          path: vyos-build/build/vyos-${{ env.VERSION }}-*.ova
+          name: vyos-${{ env.ARCHITECTURE }}-ova
+          path: vyos-build/build/vyos-*.ova
 
   release:
     runs-on: ubuntu-latest
     needs:
+      - getrev
       - build-ova
       - build-iso
     
@@ -88,19 +101,25 @@ jobs:
       - name: Download ova artifact
         uses: actions/download-artifact@v2
         with:
-          name: vyos-${{ env.VERSION }}-${{ env.ARCHITECTURE }}-ova
-          path: vyos-${{ env.VERSION }}-${{ env.ARCHITECTURE }}
+          name: vyos-${{ env.ARCHITECTURE }}-ova
+          path: vyos-${{ env.ARCHITECTURE }}
 
       - name: Download iso artifact
         uses: actions/download-artifact@v2
         with:
-          name: vyos-${{ env.VERSION }}-${{ env.ARCHITECTURE }}-iso
-          path: vyos-${{ env.VERSION }}-${{ env.ARCHITECTURE }}
+          name: vyos-${{ env.ARCHITECTURE }}-iso
+          path: vyos-${{ env.ARCHITECTURE }}
+
+      - uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          omitBody: true
+          tag: ${{ needs.getrev.outputs.rtag }}
 
       - name: Upload release asset
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tag_name="v${{ env.VERSION }}"
-          find ./vyos-${{ env.VERSION }}-${{ env.ARCHITECTURE }}/ -name "vyos-${{ env.VERSION }}-*" \
-             -type f -exec hub release edit -a "{}" -m "" "$tag_name" \;
+          TAG_NAME=${{ needs.getrev.outputs.rtag }}
+          find ./vyos-${{ env.ARCHITECTURE }}/ -name "vyos-*" \
+             -type f -exec hub release edit -a "{}" -m "" "${TAG_NAME}" \;
