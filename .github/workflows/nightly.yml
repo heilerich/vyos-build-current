@@ -1,0 +1,105 @@
+name: VyOS v1.3 Rolling Release
+
+on:
+  schedule:
+    - cron: 2 6 * * *
+  push:
+    branches:
+      - development
+
+env:
+  GIT_CLONE_URL: https://github.com/vyos/vyos-build
+  BRANCH: equuleus
+  ARCHITECTURE: amd64
+  BUILD_BY: code@fehe.eu
+  BUILD_TYPE: release
+  VERSION: 1.3-rolling
+  DEBIAN_MIRROR: http://ftp.us.debian.org/debian/
+
+jobs:
+  build-iso:
+    runs-on: ubuntu-latest
+    container:
+      image: vyos/vyos-build:equuleus
+      options: --workdir /vyos --privileged
+    
+    steps:
+      - name: Clone source code
+        run: git clone -b $BRANCH --single-branch $GIT_CLONE_URL
+        
+      - name: Build ISO
+        working-directory: ./vyos-build
+        run: |
+          ./configure --architecture $ARCHITECTURE --build-by $BUILD_BY --build-type $BUILD_TYPE --version $VERSION-$(git rev-parse --short HEAD)
+          sudo make iso
+          
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: vyos-${{ env.VERSION }}-${{ env.ARCHITECTURE }}-iso
+          path: vyos-build/build/vyos-${{ env.VERSION }}-*.iso
+
+  build-ova:
+    runs-on: ubuntu-latest
+    container:
+      image: vyos/vyos-build:equuleus
+      options: --workdir /vyos --privileged
+    
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Decrypt dependencies
+        run: |
+          gpg --decrypt --passphrase ${{ secrets.ENC_KEY }} --batch $GITHUB_WORKSPACE/ovf-4.4.1.bundle.gpg > /vyos/ovf.bundle
+          gpg --decrypt --passphrase ${{ secrets.ENC_KEY }} --batch $GITHUB_WORKSPACE/sign.pem.gpg > /vyos/sign.pem
+
+      - name: Install dependencies
+        run: sh /vyos/ovf.bundle --eulas-agreed
+
+      - name: Clone source code
+        run: git clone -b $BRANCH --single-branch $GIT_CLONE_URL
+        
+      - name: Build OVA
+        working-directory: ./vyos-build
+        run: |
+          mkdir key && cp /vyos/sign.pem key/privatekey.pem
+          ./configure --architecture $ARCHITECTURE --build-by $BUILD_BY --build-type $BUILD_TYPE --version $VERSION-$(git rev-parse --short HEAD)
+          sudo make vmware
+          cp build/vyos_vmware_image-signed.ova build/vyos-$VERSION-latest-$ARCHITECTURE.ova
+          mv build/vyos_vmware_image-signed.ova build/vyos-$VERSION-$(git rev-parse --short HEAD)-$ARCHITECTURE.ova
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: vyos-${{ env.VERSION }}-${{ env.ARCHITECTURE }}-ova
+          path: vyos-build/build/vyos-${{ env.VERSION }}-*.ova
+
+  release:
+    runs-on: ubuntu-latest
+    needs:
+      - build-ova
+      - build-iso
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+
+      - name: Download ova artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: vyos-${{ env.VERSION }}-${{ env.ARCHITECTURE }}-ova
+          path: vyos-${{ env.VERSION }}-${{ env.ARCHITECTURE }}
+
+      - name: Download iso artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: vyos-${{ env.VERSION }}-${{ env.ARCHITECTURE }}-iso
+          path: vyos-${{ env.VERSION }}-${{ env.ARCHITECTURE }}
+
+      - name: Upload release asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag_name="v${{ env.VERSION }}"
+          find ./vyos-${{ env.VERSION }}-${{ env.ARCHITECTURE }}/ -name "vyos-${{ env.VERSION }}-*" \
+              -exec hub release edit -a "{}" -m "" "$tag_name" \;
