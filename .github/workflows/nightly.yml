@@ -69,7 +69,13 @@ jobs:
           gpg --decrypt --passphrase ${{ secrets.ENC_KEY }} --batch $GITHUB_WORKSPACE/sign.pem.gpg > /vyos/sign.pem
 
       - name: Install dependencies
-        run: sh /vyos/ovf.bundle --eulas-agreed
+        run: |
+          sh /vyos/ovf.bundle --eulas-agreed
+          wget https://github.com/vmware/open-vmdk/archive/master.zip
+          unzip master.zip
+          cd open-vmdk-master
+          make
+          make install
 
       - name: Clone source code
         run: git clone -b $BRANCH --single-branch $GIT_CLONE_URL
