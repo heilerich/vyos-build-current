@@ -42,6 +42,7 @@ jobs:
         
       - name: Build ISO
         working-directory: ./vyos-build
+        continue-on-error: true
         run: |
           ./configure --architecture $ARCHITECTURE --build-by $BUILD_BY --build-type $BUILD_TYPE --version $VERSION-$(git rev-parse --short HEAD)
           sudo make iso
@@ -115,6 +116,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           omitBody: true
           tag: ${{ needs.getrev.outputs.rtag }}
+          allowUpdates: true
 
       - name: Upload release asset
         env:
