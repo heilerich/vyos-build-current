@@ -1,4 +1,4 @@
-name: VyOS v1.3 Rolling Release
+name: VyOS Current
 
 on:
   schedule:
@@ -9,11 +9,11 @@ on:
 
 env:
   GIT_CLONE_URL: https://github.com/vyos/vyos-build
-  BRANCH: equuleus
+  BRANCH: current
   ARCHITECTURE: amd64
   BUILD_BY: code@fehe.eu
   BUILD_TYPE: release
-  VERSION: 1.3-rolling
+  VERSION: 1.4-rolling
   DEBIAN_MIRROR: http://ftp.us.debian.org/debian/
 
 jobs:
@@ -33,7 +33,7 @@ jobs:
   build-iso:
     runs-on: ubuntu-latest
     container:
-      image: vyos/vyos-build:equuleus
+      image: vyos/vyos-build:current
       options: --workdir /vyos --privileged
     
     steps:
@@ -57,7 +57,7 @@ jobs:
   build-ova:
     runs-on: ubuntu-latest
     container:
-      image: vyos/vyos-build:equuleus
+      image: vyos/vyos-build:current
       options: --workdir /vyos --privileged
     
     steps:
