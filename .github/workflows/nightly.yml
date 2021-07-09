@@ -71,11 +71,12 @@ jobs:
       - name: Install dependencies
         run: |
           sh /vyos/ovf.bundle --eulas-agreed
-          wget https://github.com/vmware/open-vmdk/archive/master.zip
-          unzip master.zip
-          cd open-vmdk-master
+          git clone https://github.com/vmware/open-vmdk.git
+          cd open-vmdk
+          git checkout 40c559a
           make
           make install
+          cd ..
 
       - name: Clone source code
         run: git clone -b $BRANCH --single-branch $GIT_CLONE_URL
