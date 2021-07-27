@@ -80,6 +80,15 @@ jobs:
 
       - name: Clone source code
         run: git clone -b $BRANCH --single-branch $GIT_CLONE_URL
+
+      - name: Restore build scripts
+        working-directory: ./vyos-build
+        run: |
+          git checkout 220bcf59f2bc31e02d786bf741816333cfb56a52 -- tools/cloud-init/vmware
+          git checkout 220bcf59f2bc31e02d786bf741816333cfb56a52 -- tools/cloud-init/cloud-init.list.chroot
+          git checkout 220bcf59f2bc31e02d786bf741816333cfb56a52 -- scripts/build-vmware-image
+          git checkout 220bcf59f2bc31e02d786bf741816333cfb56a52 -- scripts/template.ovf
+          git checkout 220bcf59f2bc31e02d786bf741816333cfb56a52 -- Makefile
         
       - name: Build OVA
         working-directory: ./vyos-build
